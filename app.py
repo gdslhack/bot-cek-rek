@@ -1,8 +1,11 @@
 import os
 import requests
 from flask import Flask, request
-from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters
+from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Dispatcher, CommandHandler, CallbackContext, CallbackQueryHandler, ConversationHandler, MessageHandler, Filters
+
+# Define states for the conversation
+CHOOSE_METHOD, GET_ACCOUNT_NUMBER = range(2)
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 bot = Bot(token=TOKEN)
@@ -21,29 +24,69 @@ def check_ewallet(account_number: str, bank_code: str):
             return "Gagal mengambil data. Pastikan nomor rekening benar."
     return "Gagal menghubungi server."
 
-# Command /start
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("Halo! Kirim /cek <bank_code> <account_number> untuk cek nama pengguna e-wallet.")
+# Start conversation
+def start(update: Update, context: CallbackContext) -> int:
+    keyboard = [
+        [InlineKeyboardButton("Cek Dana", callback_data='dana')],
+        [InlineKeyboardButton("Cek OVO", callback_data='ovo')],
+        [InlineKeyboardButton("Cek ShopeePay", callback_data='shopeepay')],
+        [InlineKeyboardButton("Cek LinkAja", callback_data='linkaja')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Pilih metode e-wallet yang ingin Anda cek:", reply_markup=reply_markup)
+    return CHOOSE_METHOD
 
-# Command /cek
-def cek(update: Update, context: CallbackContext) -> None:
-    if len(context.args) != 2:
-        update.message.reply_text("Penggunaan: /cek <bank_code> <account_number>")
-        return
+# Handle button presses
+def button(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    query.answer()
 
-    bank_code, account_number = context.args
+    # Save chosen method in user data
+    context.user_data['method'] = query.data
+    query.edit_message_text(text="Silakan kirim nomor rekening yang ingin Anda cek.")
+    return GET_ACCOUNT_NUMBER
+
+# Handle account number input
+def receive_account_number(update: Update, context: CallbackContext) -> int:
+    account_number = update.message.text
+    method = context.user_data.get('method')
+    
+    # Placeholder account codes
+    account_info = {
+        'dana': 'DANA_CODE',
+        'ovo': 'OVO_CODE',
+        'shopeepay': 'SHOPEEPAY_CODE',
+        'linkaja': 'LINKAJA_CODE'
+    }
+    
+    bank_code = account_info.get(method)
+    if not bank_code:
+        update.message.reply_text("Metode e-wallet tidak dikenali.")
+        return ConversationHandler.END
+
     result = check_ewallet(account_number, bank_code)
     update.message.reply_text(result)
+    return ConversationHandler.END
 
-# Handle incoming webhook updates
-def handle_update(update: Update) -> None:
-    dispatcher.process_update(update)
+# Create dispatcher and add handlers
+dispatcher = Dispatcher(bot, None, workers=0)
+
+# Add handlers to dispatcher
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(ConversationHandler(
+    entry_points=[CallbackQueryHandler(button)],
+    states={
+        CHOOSE_METHOD: [MessageHandler(Filters.text & ~Filters.command, receive_account_number)],
+        GET_ACCOUNT_NUMBER: [MessageHandler(Filters.text & ~Filters.command, receive_account_number)],
+    },
+    fallbacks=[]
+))
 
 # Setup Telegram webhook route
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
-    handle_update(update)
+    dispatcher.process_update(update)
     return "ok"
 
 # Setup Flask route for health check
@@ -52,12 +95,6 @@ def index():
     return "Bot is running"
 
 if __name__ == "__main__":
-    # Create dispatcher and add handlers
-    dispatcher = Dispatcher(bot, None, workers=0)
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("cek", cek))
-    
     # Set webhook to Vercel's domain
     bot.set_webhook(url=f"https://{os.getenv('VERCEL_URL')}/{TOKEN}")
-    
     app.run(debug=True)
