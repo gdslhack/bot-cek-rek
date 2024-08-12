@@ -2,7 +2,7 @@ import os
 import requests
 from flask import Flask, request
 from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, CallbackContext, Updater
+from telegram.ext import Dispatcher, CommandHandler, CallbackContext
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 bot = Bot(token=TOKEN)
@@ -35,6 +35,11 @@ def cek(update: Update, context: CallbackContext) -> None:
     result = check_ewallet(account_number, bank_code)
     update.message.reply_text(result)
 
+# Create dispatcher
+dispatcher = Dispatcher(bot, None, workers=0)
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(CommandHandler("cek", cek))
+
 # Setup Telegram webhook route
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
@@ -48,13 +53,6 @@ def index():
     return "Bot is running"
 
 if __name__ == "__main__":
-    # Setup Dispatcher
-    updater = Updater(token=TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("cek", cek))
-
     # Set webhook to Vercel's domain
     bot.set_webhook(url=f"https://{os.getenv('VERCEL_URL')}/{TOKEN}")
-
     app.run(debug=True)
