@@ -2,7 +2,7 @@ import os
 import requests
 from flask import Flask, request
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Dispatcher, CommandHandler, CallbackContext, CallbackQueryHandler
+from telegram.ext import Dispatcher, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, Filters
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 bot = Bot(token=TOKEN)
@@ -24,50 +24,32 @@ def check_ewallet(account_number: str, bank_code: str):
 # Command /start
 def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [InlineKeyboardButton("Cek Dana", callback_data='dana')],
-        [InlineKeyboardButton("Cek OVO", callback_data='ovo')],
-        [InlineKeyboardButton("Cek ShopeePay", callback_data='shopeepay')],
-        [InlineKeyboardButton("Cek LinkAja", callback_data='linkaja')],
+        [InlineKeyboardButton("Dana", callback_data='DANA')],
+        [InlineKeyboardButton("OVO", callback_data='OVO')],
+        [InlineKeyboardButton("ShopeePay", callback_data='SHP')],
+        [InlineKeyboardButton("LinkAja", callback_data='LA')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("Pilih metode e-wallet yang ingin Anda cek:", reply_markup=reply_markup)
+    update.message.reply_text('Pilih layanan e-wallet:', reply_markup=reply_markup)
 
-# Command /cek
-def cek(update: Update, context: CallbackContext) -> None:
-    if len(context.args) != 2:
-        update.message.reply_text("Penggunaan: /cek <bank_code> <account_number>")
-        return
-
-    bank_code, account_number = context.args
-    result = check_ewallet(account_number, bank_code)
-    update.message.reply_text(result)
-
-# Handle button presses
+# Handle button press
 def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    query.answer()
-    
-    # Placeholder account numbers and bank codes
-    account_info = {
-        'dana': ('1234567890', 'DANA_CODE'),
-        'ovo': ('0987654321', 'OVO_CODE'),
-        'shopeepay': ('1122334455', 'SHOPEEPAY_CODE'),
-        'linkaja': ('5566778899', 'LINKAJA_CODE')
-    }
-    
-    bank_code, account_number = account_info.get(query.data, (None, None))
-    if not bank_code or not account_number:
-        query.edit_message_text(text="Metode e-wallet tidak dikenali.")
-        return
-    
-    result = check_ewallet(account_number, bank_code)
-    query.edit_message_text(text=result)
+    bank_code = query.data
+    query.edit_message_text(text=f"Masukkan nomor rekening untuk {bank_code}")
 
-# Create dispatcher
-dispatcher = Dispatcher(bot, None, workers=0)
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CommandHandler("cek", cek))
-dispatcher.add_handler(CallbackQueryHandler(button))
+    context.user_data['selected_bank'] = bank_code
+
+# Handle message with account number
+def handle_message(update: Update, context: CallbackContext) -> None:
+    bank_code = context.user_data.get('selected_bank')
+    if not bank_code:
+        update.message.reply_text("Pilih layanan e-wallet terlebih dahulu dengan perintah /start.")
+        return
+
+    account_number = update.message.text
+    result = check_ewallet(account_number, bank_code)
+    update.message.reply_text(result)
 
 # Setup Telegram webhook route
 @app.route(f"/{TOKEN}", methods=["POST"])
@@ -82,6 +64,13 @@ def index():
     return "Bot is running"
 
 if __name__ == "__main__":
+    from telegram.ext import Dispatcher
+
+    dispatcher = Dispatcher(bot, None, workers=0)
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CallbackQueryHandler(button))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
     # Set webhook to Vercel's domain
     bot.set_webhook(url=f"https://{os.getenv('VERCEL_URL')}/{TOKEN}")
     app.run(debug=True)
