@@ -9,6 +9,9 @@ bot = Bot(token=TOKEN)
 
 app = Flask(__name__)
 
+# Global dispatcher
+dispatcher = Dispatcher(bot, None, workers=0)
+
 # Function to check e-wallet account
 def check_ewallet(account_number: str, bank_code: str):
     url = f"https://cek-rekening-olive.vercel.app/cek-rekening?bankCode={bank_code}&accountNumber={account_number}"
@@ -64,9 +67,6 @@ def index():
     return "Bot is running"
 
 if __name__ == "__main__":
-    from telegram.ext import Dispatcher
-
-    dispatcher = Dispatcher(bot, None, workers=0)
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CallbackQueryHandler(button))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
