@@ -2,7 +2,7 @@ import os
 import requests
 from flask import Flask, request
 from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler, CallbackContext
+from telegram.ext import Dispatcher, CommandHandler, CallbackContext, Updater
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 bot = Bot(token=TOKEN)
@@ -48,12 +48,13 @@ def index():
     return "Bot is running"
 
 if __name__ == "__main__":
-    from telegram.ext import Dispatcher
-
-    dispatcher = Dispatcher(bot, None, workers=0)
+    # Setup Dispatcher
+    updater = Updater(token=TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("cek", cek))
 
     # Set webhook to Vercel's domain
     bot.set_webhook(url=f"https://{os.getenv('VERCEL_URL')}/{TOKEN}")
+
     app.run(debug=True)
