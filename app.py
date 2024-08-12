@@ -27,10 +27,10 @@ def check_ewallet(account_number: str, bank_code: str):
 # Start conversation
 def start(update: Update, context: CallbackContext) -> int:
     keyboard = [
-        [InlineKeyboardButton("Cek Dana", callback_data='dana')],
-        [InlineKeyboardButton("Cek OVO", callback_data='ovo')],
-        [InlineKeyboardButton("Cek ShopeePay", callback_data='shopeepay')],
-        [InlineKeyboardButton("Cek LinkAja", callback_data='linkaja')],
+        [InlineKeyboardButton("Cek Dana", callback_data='DANA')],
+        [InlineKeyboardButton("Cek OVO", callback_data='OVO')],
+        [InlineKeyboardButton("Cek ShopeePay", callback_data='SHOPEEPAY')],
+        [InlineKeyboardButton("Cek LinkAja", callback_data='LINKAJA')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text("Pilih metode e-wallet yang ingin Anda cek:", reply_markup=reply_markup)
@@ -53,10 +53,10 @@ def receive_account_number(update: Update, context: CallbackContext) -> int:
     
     # Placeholder account codes
     account_info = {
-        'dana': 'DANA_CODE',
-        'ovo': 'OVO_CODE',
-        'shopeepay': 'SHOPEEPAY_CODE',
-        'linkaja': 'LINKAJA_CODE'
+        'DANA': 'DANA_CODE',
+        'OVO': 'OVO_CODE',
+        'SHOPEEPAY': 'SHOPEEPAY_CODE',
+        'LINKAJA': 'LINKAJA_CODE'
     }
     
     bank_code = account_info.get(method)
